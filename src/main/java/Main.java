@@ -36,14 +36,15 @@ public class Main {
                 int lastIdLocked = userDao.getLastIdLocked();
                 if(lastIdLocked == limite){
                     //JÁ HOUVE RESERVAS ATÉ O LIMITE
+                    lock.release();
                     imprimirTempo(t0);
                     break;
                 }else{
                     //RESERVAR NOVO ID
                     contador = lastIdLocked + 1;
                     userDao.lockId(contador, INSTANCE_APP);
+                    lock.release();
                 }
-                lock.release();
             //UNLOCK DATABASE
 
             queueInsert.put(contador);
