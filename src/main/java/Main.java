@@ -1,18 +1,50 @@
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.sql.SQLException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 public class Main {
-    public static void main(String[] args) throws InterruptedException {
+    private static String INSTANCE_APP;
+    private static String PATH_FILE_LOCK_SHARED;
+    public static void main(String[] args) throws InterruptedException, IOException {
+        INSTANCE_APP = args[0];
+        PATH_FILE_LOCK_SHARED = args[1];
+
+        File fileLock = new File(PATH_FILE_LOCK_SHARED);
+        RandomAccessFile raf = new RandomAccessFile(fileLock, "rw");
+        FileChannel channel = raf.getChannel();
 
         final UserDao userDao = new UserDao();
 
         int contador = 1;
+        int limite = 1000;
         final long t0 = System.currentTimeMillis();
-        final BlockingQueue<Integer> queueInsert = new ArrayBlockingQueue<Integer>(20);
-        final BlockingQueue<Integer> queueUpdate = new ArrayBlockingQueue<Integer>(20);
-        final BlockingQueue<Integer> queueDelete = new ArrayBlockingQueue<Integer>(20);
-        while(contador <= 1000){
+        final BlockingQueue<Integer> queueInsert = new ArrayBlockingQueue<Integer>(10);
+        final BlockingQueue<Integer> queueUpdate = new ArrayBlockingQueue<Integer>(10);
+        final BlockingQueue<Integer> queueDelete = new ArrayBlockingQueue<Integer>(10);
+        while(contador <= limite){
+            //LOCK DATABASE BETWEEN FILE LOCK SHARED
+                FileLock lock = channel.lock();
+                int lastIdLocked = userDao.getLastIdLocked();
+                if(lastIdLocked == limite){
+                    //JÁ HOUVE RESERVAS ATÉ O LIMITE
+                    long t1 = System.currentTimeMillis();
+                    long tempoTotal = t1 - t0;
+                    System.out.println("Durou: " + tempoTotal);
+                    break;
+                }else{
+                    //RESERVAR NOVO ID
+                    contador = lastIdLocked + 1;
+                    userDao.lockId(contador, INSTANCE_APP);
+                }
+                lock.release();
+            //UNLOCK DATABASE
+
             queueInsert.put(contador);
 
             Runnable runnableInsert = new Runnable() {
@@ -22,8 +54,6 @@ public class Main {
                         User user = new User(take,"JoãoDeDeus");
                         userDao.insert(user);
                         queueUpdate.put(take);
-                    } catch (SQLException e) {
-                        e.printStackTrace();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -36,8 +66,6 @@ public class Main {
                         Integer take = queueUpdate.take();
                         userDao.update(take);
                         queueDelete.put(take);
-                    } catch (SQLException e) {
-                        e.printStackTrace();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -50,15 +78,11 @@ public class Main {
                     try {
                         Integer take = queueDelete.take();
                         userDao.delete(take);
-
-                        if (take == 1000) {
+                        if (take == limite) {
                             long t1 = System.currentTimeMillis();
                             long tempoTotal = t1 - t0;
-
                             System.out.println("Durou: " + tempoTotal);
                         }
-                    } catch (SQLException e) {
-                        e.printStackTrace();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
