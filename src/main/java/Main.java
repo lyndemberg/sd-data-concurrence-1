@@ -1,5 +1,4 @@
 import java.sql.SQLException;
-import java.sql.SQLOutput;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -9,11 +8,11 @@ public class Main {
         final UserDao userDao = new UserDao();
 
         int contador = 1;
-        long t0 = System.currentTimeMillis();
+        final long t0 = System.currentTimeMillis();
         final BlockingQueue<Integer> queueInsert = new ArrayBlockingQueue<Integer>(20);
         final BlockingQueue<Integer> queueUpdate = new ArrayBlockingQueue<Integer>(20);
         final BlockingQueue<Integer> queueDelete = new ArrayBlockingQueue<Integer>(20);
-        while(contador <= 10000){
+        while(contador <= 1000){
             queueInsert.put(contador);
 
             Runnable runnableInsert = new Runnable() {
@@ -51,6 +50,13 @@ public class Main {
                     try {
                         Integer take = queueDelete.take();
                         userDao.delete(take);
+
+                        if (take == 1000) {
+                            long t1 = System.currentTimeMillis();
+                            long tempoTotal = t1 - t0;
+
+                            System.out.println("Durou: " + tempoTotal);
+                        }
                     } catch (SQLException e) {
                         e.printStackTrace();
                     } catch (InterruptedException e) {
@@ -69,9 +75,5 @@ public class Main {
             contador ++;
 
         }
-        long t1 = System.currentTimeMillis();
-        long tempoTotal = t1 - t0;
-
-        System.out.println("Durou: " + tempoTotal);
     }
 }
