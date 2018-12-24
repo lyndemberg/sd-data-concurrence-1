@@ -11,9 +11,12 @@ import java.util.concurrent.BlockingQueue;
 public class Main {
     private static String INSTANCE_APP;
     private static String PATH_FILE_LOCK_SHARED;
+    private static int CAPACITY_QUEUES;
+
     public static void main(String[] args) throws InterruptedException, IOException {
         INSTANCE_APP = args[0];
         PATH_FILE_LOCK_SHARED = args[1];
+        CAPACITY_QUEUES = Integer.valueOf(args[2]);
 
         File fileLock = new File(PATH_FILE_LOCK_SHARED);
         RandomAccessFile raf = new RandomAccessFile(fileLock, "rw");
@@ -22,20 +25,18 @@ public class Main {
         final UserDao userDao = new UserDao();
 
         int contador = 1;
-        int limite = 1000;
+        final int limite = 1000;
         final long t0 = System.currentTimeMillis();
-        final BlockingQueue<Integer> queueInsert = new ArrayBlockingQueue<Integer>(10);
-        final BlockingQueue<Integer> queueUpdate = new ArrayBlockingQueue<Integer>(10);
-        final BlockingQueue<Integer> queueDelete = new ArrayBlockingQueue<Integer>(10);
+        final BlockingQueue<Integer> queueInsert = new ArrayBlockingQueue<Integer>(CAPACITY_QUEUES);
+        final BlockingQueue<Integer> queueUpdate = new ArrayBlockingQueue<Integer>(CAPACITY_QUEUES);
+        final BlockingQueue<Integer> queueDelete = new ArrayBlockingQueue<Integer>(CAPACITY_QUEUES);
         while(contador <= limite){
             //LOCK DATABASE BETWEEN FILE LOCK SHARED
                 FileLock lock = channel.lock();
                 int lastIdLocked = userDao.getLastIdLocked();
                 if(lastIdLocked == limite){
                     //JÁ HOUVE RESERVAS ATÉ O LIMITE
-                    long t1 = System.currentTimeMillis();
-                    long tempoTotal = t1 - t0;
-                    System.out.println("Durou: " + tempoTotal);
+                    imprimirTempo(t0);
                     break;
                 }else{
                     //RESERVAR NOVO ID
@@ -79,9 +80,7 @@ public class Main {
                         Integer take = queueDelete.take();
                         userDao.delete(take);
                         if (take == limite) {
-                            long t1 = System.currentTimeMillis();
-                            long tempoTotal = t1 - t0;
-                            System.out.println("Durou: " + tempoTotal);
+                            imprimirTempo(t0);
                         }
                     } catch (InterruptedException e) {
                         e.printStackTrace();
@@ -99,5 +98,11 @@ public class Main {
             contador ++;
 
         }
+    }
+
+    private static void imprimirTempo(long inicio){
+        long t1 = System.currentTimeMillis();
+        long tempoTotal = t1 - inicio;
+        System.out.println(INSTANCE_APP + " - Durou: " + tempoTotal);
     }
 }
